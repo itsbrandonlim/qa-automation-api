@@ -13,6 +13,69 @@ The project currently tests the DummyJSON REST API and will evolve into a mainta
 * Hamcrest
 * Git
 
+## Framework Architecture
+
+The project follows a layered API automation architecture designed to separate test scenarios, API operations, request configuration, and environment settings.
+
+```text
+ProductTests
+     |
+     v
+ProductClient
+     |
+     v
+RequestSpecFactory
+     |
+     v
+ConfigManager
+     |
+     v
+DummyJSON REST API
+```
+
+### Component responsibilities
+
+| Component          | Responsibility                                         |
+| ------------------ | ------------------------------------------------------ |
+| ProductTests       | Defines test scenarios and validates API responses     |
+| ProductClient      | Encapsulates Product API endpoints and HTTP operations |
+| RequestSpecFactory | Creates reusable REST Assured request specifications   |
+| ConfigManager      | Loads configuration and supports environment overrides |
+| config.properties  | Stores non-sensitive default configuration             |
+
+### Running the tests
+
+Execute all tests:
+
+```bash
+mvn clean test
+```
+
+Execute with an explicit API environment:
+
+```bash
+mvn clean test -DbaseUrl=https://dummyjson.com
+```
+
+### Test coverage
+
+The current Product API suite covers:
+
+* Retrieving products by ID
+* Handling requests for nonexistent products
+* Product category validation
+* Product collection validation
+* Product limit parameter testing
+
+### Framework design principles
+
+The framework uses separation of concerns to improve maintainability and reduce duplicated code.
+
+Tests define expected behavior, API clients handle endpoint operations, request specifications define shared HTTP configuration, and the configuration manager provides environment-specific values.
+
+The framework is being developed incrementally, with authentication, additional API clients, request/response models, data-driven testing, reporting, and CI/CD planned for subsequent phases.
+
+
 
 Planned additions:
 
@@ -44,17 +107,23 @@ The test suite includes both positive and negative API scenarios.
 
 ```text
 qa-automation-api/
-
 ├── src/
 │   └── test/
-│       └── java/
-│           └── com/
-│               └── brandon/
-│                   └── qa/
-│                       └── tests/
-│                           └── products/
-│                               └── ProductTests.java
-│
+│       ├── java/
+│       │   └── com/
+│       │       └── brandon/
+│       │           └── qa/
+│       │               ├── config/
+│       │               │   └── ConfigManager.java
+│       │               ├── specification/
+│       │               │   └── RequestSpecFactory.java
+│       │               ├── client/
+│       │               │   └── ProductClient.java
+│       │               └── tests/
+│       │                   └── products/
+│       │                       └── ProductTests.java
+│       └── resources/
+│           └── config.properties
 ├── .gitignore
 ├── pom.xml
 └── README.md

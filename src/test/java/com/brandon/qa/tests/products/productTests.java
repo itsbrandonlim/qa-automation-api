@@ -1,60 +1,61 @@
 package com.brandon.qa.tests.products;
 
-import io.restassured.RestAssured;
-import org.junit.jupiter.api.BeforeAll;
+import com.brandon.qa.client.ProductClient;
+
+import io.restassured.response.Response;
+
 import org.junit.jupiter.api.Test;
 
-import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
-class productTests {
+class ProductTests {
 
-    @BeforeAll
-    static void setup() {
-        RestAssured.baseURI = "https://dummyjson.com";
+    private final ProductClient productClient = new ProductClient();
+
+    @Test
+    void shouldGetProductById() {
+
+        Response response = productClient.getProductById(1);
+
+        response.then()
+                .statusCode(200)
+                .body("id", equalTo(1))
+                .body("title", notNullValue())
+                .body("price", notNullValue());
     }
 
     @Test
-    void shouldGetProductById(){
+    void shouldReturn404WhenProductDoesNotExist() {
 
-        given()
-            .pathParam("productId", 1)
+        Response response = productClient.getProductById(9999);
 
-        .when()
-            .get("/products/{productId}")
-
-        .then()
-            .statusCode(200)
-            .body("id", equalTo(1))
-            .body("title", notNullValue())
-            .body("price", notNullValue());
+        response.then()
+                .statusCode(404);
     }
 
     @Test
-    void shouldReturn404WhenProductDoesNotExist(){
-        
-        given()
-            .pathParam("productId", 9999)
+    void shouldReturnProductsFromRequestedCategory() {
 
-        .when()
-            .get("/products/{productId}")
+        Response response =
+                productClient.getProductsByCategory("smartphones");
 
-        .then()
-            .statusCode(404);
-    } 
+        response.then()
+                .statusCode(200)
+                .body("products", not(empty()))
+                .body(
+                        "products.category",
+                        everyItem(equalTo("smartphones"))
+                );
+    }
 
     @Test
-    void shouldReturnProductsFromRequestedCategory(){
+    void shouldLimitNumberOfProducts() {
 
-        given()
-            .pathParam("category", "smartphones")
+        Response response = productClient.getProducts(5);
 
-        .when()
-            .get("/products/category/{category}")
-
-        .then()
-            .statusCode(200)
-            .body("products", not(empty()))
-            .body("products[0].category", equalTo("smartphones"));
+        response.then()
+                .statusCode(200)
+                .body("products", hasSize(5))
+                .body("limit", equalTo(5));
     }
 }

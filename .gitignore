@@ -1,0 +1,30 @@
+# Maven build output
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Visual Studio Code
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Test reports
+allure-results/
+allure-report/
+
+# Environment files and secrets
+.env
+.env.*
+*.local.properties
+
+# Logs
+*.log
+
+# Operating system files
+.DS_Store
+Thumbs.db
