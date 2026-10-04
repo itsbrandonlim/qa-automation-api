@@ -16,7 +16,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static io.restassured.module.jsv.JsonSchemaValidator
         .matchesJsonSchemaInClasspath;
-class AuthTests {
+public class AuthTests {
 
     private static final String VALID_USERNAME = "emilys";
     private static final String VALID_PASSWORD = "emilyspass";
