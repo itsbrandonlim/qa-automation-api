@@ -10,13 +10,13 @@ import io.restassured.response.Response;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.api.DisplayName;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static io.restassured.module.jsv.JsonSchemaValidator
         .matchesJsonSchemaInClasspath;
-
-class AuthTests {
+public class AuthTests {
 
     private static final String VALID_USERNAME = "emilys";
     private static final String VALID_PASSWORD = "emilyspass";
@@ -40,6 +40,7 @@ class AuthTests {
     }
 
     @Test
+    @DisplayName("Valid credentials return a usable access token")
     void shouldLoginWithValidCredentials() {
         LoginRequest request =
                 new LoginRequest(VALID_USERNAME, VALID_PASSWORD);

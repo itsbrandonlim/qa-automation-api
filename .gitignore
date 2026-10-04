@@ -1,5 +1,8 @@
 # Maven build output
 target/
+.allure/
+allure-results/
+allure-report/
 
 # IntelliJ IDEA
 .idea/
