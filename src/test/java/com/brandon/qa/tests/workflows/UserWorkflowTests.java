@@ -1,5 +1,7 @@
 package com.brandon.qa.tests.workflows;
 
+import com.brandon.qa.config.ConfigManager;
+
 import com.brandon.qa.client.AuthClient;
 import com.brandon.qa.client.TodoClient;
 import com.brandon.qa.model.LoginRequest;
@@ -23,8 +25,10 @@ class UserWorkflowTests {
     @DisplayName("Login, retrieve profile, and verify the user's todos")
     void shouldRetrieveTodosForLoggedInUser() {
         // Step 1: Log in using DummyJSON's public demo account.
-        LoginRequest loginRequest =
-                new LoginRequest("emilys", "emilyspass");
+        LoginRequest loginRequest = new LoginRequest(
+                ConfigManager.getUsername(),
+                ConfigManager.getPassword()
+        );
 
         Response loginResponse = authClient.login(loginRequest);
 
