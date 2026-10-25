@@ -1,6 +1,7 @@
 package com.brandon.qa.tests.auth;
 
 import com.brandon.qa.client.AuthClient;
+import com.brandon.qa.config.ConfigManager;
 import com.brandon.qa.model.LoginRequest;
 import com.brandon.qa.model.LoginResponse;
 
@@ -18,8 +19,8 @@ import static io.restassured.module.jsv.JsonSchemaValidator
         .matchesJsonSchemaInClasspath;
 public class AuthTests {
 
-    private static final String VALID_USERNAME = "emilys";
-    private static final String VALID_PASSWORD = "emilyspass";
+    private static final String VALID_USERNAME = ConfigManager.getUsername();
+    private static final String VALID_PASSWORD = ConfigManager.getPassword();
 
     private final AuthClient authClient = new AuthClient();
 

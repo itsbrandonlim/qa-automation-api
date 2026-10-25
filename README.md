@@ -1,83 +1,75 @@
 # QA Automation API Framework
 
-API automation portfolio project demonstrating practical Quality Engineering and test automation skills using Java, REST Assured, JUnit 5, and Maven.
+API automation portfolio project demonstrating practical Quality Engineering with Java 25, REST Assured, JUnit 5, and Maven.
 
-The framework tests the [DummyJSON REST API](https://dummyjson.com) through reusable API clients, shared request specifications, configurable environment settings, and request/response models. It covers product endpoints and authentication workflows with positive, negative, data-driven, and JSON Schema tests.
+The suite tests the [DummyJSON REST API](https://dummyjson.com) and a local in-memory todo API. It covers products, authentication, an authenticated user workflow, and independent test-data setup and cleanup.
 
 ## Project Status
 
-**Current milestone: Phase 3 — Authentication and stronger API tests.**
+**Current milestone: Phase 5 — Checkpoint 5.3, environment configuration.**
 
-| Phase | Scope | Status |
+| Phase / checkpoint | Scope | Implementation |
 | --- | --- | --- |
-| 1 | Project setup and initial Product API tests | Complete |
-| 2 | Configuration management, shared request specifications, and API client layer | Complete |
-| 3 | Authentication, Java models, Jackson mapping, parameterized tests, and JSON Schema validation | Complete |
-| 4 | Allure reporting and GitHub Actions continuous integration | Planned |
+| 1–2 | Product tests, configuration, request specifications, API clients | Implemented |
+| 3 | Authentication, Java models, parameterized tests, JSON Schema validation | Implemented |
+| 4 | Allure reporting and GitHub Actions | Implemented |
+| 5.1 | Login → profile → user todos workflow | Implemented |
+| 5.2 | Local test-data setup and cleanup | Implemented |
+| 5.3 | Environment profiles and runtime overrides | Implemented |
+| 5.4 | Parallel execution | Next |
+
+Implementation status is separate from execution results: use the latest Maven output and CI run to confirm whether tests pass.
 
 ## Tech Stack
 
 | Technology | Purpose |
 | --- | --- |
-| Java 21 | Test and framework implementation |
-| Maven | Dependency management and test execution |
-| REST Assured | HTTP requests and API response validation |
-| JUnit 5 | Test execution and parameterized scenarios |
-| Hamcrest | Readable response assertions |
-| Jackson | Java-to-JSON serialization and JSON-to-Java deserialization |
-| REST Assured JSON Schema Validator | Response structure and type validation |
-| Git and GitHub | Version control and pull request workflow |
+| Java 25 | Test and framework implementation |
+| Maven | Dependencies and test execution |
+| REST Assured / Hamcrest | HTTP requests and response assertions |
+| JUnit 5 | Tests, lifecycle hooks, parameterized scenarios |
+| Jackson | Request/response JSON mapping |
+| JSON Schema Validator | Login response contract checks |
+| Allure | Test results and HTML reports |
+| GitHub Actions | CI execution and downloadable reports |
+| Java HTTP server | Local in-memory todo test fixture |
 
-Dependency versions are defined in `pom.xml`.
+Dependency versions and build plugins are defined in `pom.xml`.
 
-## Framework Architecture
+## Framework Structure
 
-Tests define expected behavior and call API clients. Clients handle HTTP methods, endpoints, request bodies, and authentication headers. `RequestSpecFactory` provides shared request configuration using the base URL supplied by `ConfigManager`.
+Java source paths are relative to `src/test/java/com/brandon/qa/`.
 
-Request and response models represent authentication data, while schema files define the response structure checked by contract tests.
-
-| Component | Responsibility |
+| Location | Responsibility |
 | --- | --- |
-| `ProductTests` | Validates product retrieval, missing products, categories, and limits |
-| `AuthTests` | Validates login, authenticated access, missing authentication, and the login response schema |
-| `ProductClient` | Encapsulates Product API endpoints and HTTP operations |
-| `AuthClient` | Encapsulates login and current-user requests |
-| `LoginRequest` | Represents the username and password sent during login |
-| `LoginResponse` | Represents selected login response fields, including the access token |
-| `RequestSpecFactory` | Creates shared REST Assured request specifications |
-| `ConfigManager` | Loads the default base URL and supports a JVM system-property override |
-| `config.properties` | Stores non-sensitive default configuration |
-| `login-response-schema.json` | Defines required login response fields, types, and constraints |
-
-## Project Structure
-
-Java source paths below are relative to `src/test/java/com/brandon/qa/`.
-
-| Location | File |
-| --- | --- |
-| `config/` | `ConfigManager.java` |
-| `specification/` | `RequestSpecFactory.java` |
-| `client/` | `ProductClient.java`, `AuthClient.java` |
-| `model/` | `LoginRequest.java`, `LoginResponse.java` |
-| `tests/products/` | Product test class: `ProductTests` |
-| `tests/auth/` | `AuthTests.java` |
+| `config/ConfigManager.java` | Selects a profile, resolves overrides, validates base URLs |
+| `specification/RequestSpecFactory.java` | Creates a fresh request specification for a configured or explicit URL |
+| `client/` | `ProductClient`, `AuthClient`, `TodoClient`, and `LocalTodoClient` encapsulate HTTP operations |
+| `model/` | `LoginRequest` and `LoginResponse` represent authentication data |
+| `support/LocalTodoApi.java` | Starts an in-memory API on an available loopback port |
+| `testdata/TodoDataFactory.java` | Creates unique todo payloads |
+| `tests/products/productTests.java` | Contains the `ProductTests` class |
+| `tests/auth/AuthTests.java` | Authentication and schema tests |
+| `tests/workflows/UserWorkflowTests.java` | Login, retrieve profile, and verify user todos |
+| `tests/lifecycle/TodoLifecycleTests.java` | Create, retrieve, delete, and clean up local todos |
 
 | Project-relative path | Purpose |
 | --- | --- |
-| `src/test/resources/config.properties` | Default API configuration |
-| `src/test/resources/schemas/login-response-schema.json` | Login response schema |
-| `pom.xml` | Maven dependencies and build plugins |
-| `.gitignore` | Excludes generated files and local tooling output |
-| `README.md` | Project overview and execution instructions |
+| `src/test/resources/environments/dummyjson.properties` | Default API URL and public demo credentials |
+| `src/test/resources/environments/local.properties` | Local profile; server URL is supplied at runtime |
+| `src/test/resources/schemas/login-response-schema.json` | Login response contract |
+| `src/test/resources/allure.properties` | Allure results directory |
+| `.github/workflows/api-tests.yml` | Java 25 CI, test execution, report generation, artifact upload |
+
+Tests describe behavior; clients handle requests. Both remote and local clients use `RequestSpecFactory`. Local clients explicitly supply the server-generated URL, so global base-URL overrides cannot redirect their setup or cleanup requests.
 
 ## Prerequisites
 
-- JDK 21
-- Maven installed and available on `PATH`
-- Git to clone the repository
-- Internet access to download dependencies and reach DummyJSON
+- JDK 25 and Maven available on `PATH`
+- Git
+- Internet access for dependency downloads and DummyJSON tests
 
-Verify the installed tools:
+Check your tools:
 
 ```bash
 java -version
@@ -85,132 +77,144 @@ mvn -version
 git --version
 ```
 
-Ensure `mvn -version` reports Java 21.
+**Maven must report Java 25.** If it reports Java 21, point `JAVA_HOME` to your JDK 25 installation before running Maven. Otherwise compilation fails with `invalid target release: 25`.
 
-## Getting Started
-
-Clone the repository and open the project directory:
+## Run Tests
 
 ```bash
 git clone https://github.com/itsbrandonlim/qa-automation-api.git
 cd qa-automation-api
-```
-
-Run Maven commands from the directory containing `pom.xml`.
-
-### Run all tests
-
-```bash
 mvn clean test
 ```
 
-### Run only product tests
+Run commands from the directory containing `pom.xml`.
+
+| Scope | Command |
+| --- | --- |
+| Full suite, explicit default profile | `mvn "-Denv=dummyjson" clean test` |
+| Products | `mvn "-Dtest=ProductTests" test` |
+| Authentication | `mvn "-Dtest=AuthTests" test` |
+| User workflow | `mvn "-Dtest=UserWorkflowTests" test` |
+| Local lifecycle | `mvn "-Denv=local" "-Dtest=TodoLifecycleTests" test` |
+
+`-Denv` selects configuration; `-Dtest` selects tests. The `local` profile does not select local tests automatically. Running the entire suite with `-Denv=local` fails because the local API has no DummyJSON authentication or product endpoints.
+
+## Environment Configuration
+
+Profile selection: **Java system property → environment variable → default `dummyjson`**.
+
+Setting precedence: **Java system property → environment variable → selected profile file**.
+
+| Setting | System property | Environment variable | Profile key / default |
+| --- | --- | --- | --- |
+| Profile | `env` | `TEST_ENV` | `dummyjson` |
+| Base URL | `baseUrl` | `API_BASE_URL` | `base.url` |
+| Username | `apiUsername` | `API_USERNAME` | `auth.username` |
+| Password | `apiPassword` | `API_PASSWORD` | `auth.password` |
+
+Profiles are loaded from `src/test/resources/environments/<profile>.properties`. The former `config.properties` file is no longer used.
+
+- The profile is selected once per JVM. Set it before starting tests.
+- Profile names are normalized to lowercase and allow letters, numbers, and hyphens.
+- Blank overrides are treated as absent; passwords are preserved without trimming.
+- Unknown profiles fail during configuration initialization.
+- Missing settings fail when requested. Local tests do not request login credentials.
+- Base URLs require HTTP(S) and a host, without embedded credentials, a query, or a fragment.
+- An explicit local-server URL takes precedence over all base-URL settings.
+- Changing the target URL requires an API with the endpoints and contracts expected by the selected tests.
+
+Override the configured URL:
 
 ```bash
-mvn "-Dtest=ProductTests" test
+mvn "-Denv=dummyjson" "-DbaseUrl=https://dummyjson.com" "-Dtest=UserWorkflowTests" test
 ```
 
-### Run only authentication tests
+Use an environment variable in PowerShell (restore any prior value afterward):
+
+```powershell
+$previousTestEnv = $env:TEST_ENV
+try {
+    $env:TEST_ENV = "local"
+    mvn "-Dtest=TodoLifecycleTests" test
+
+    # The system property overrides TEST_ENV.
+    mvn "-Denv=dummyjson" "-Dtest=UserWorkflowTests" test
+} finally {
+    $env:TEST_ENV = $previousTestEnv
+}
+```
+
+On macOS/Linux:
 
 ```bash
-mvn "-Dtest=AuthTests" test
+TEST_ENV=local mvn "-Dtest=TodoLifecycleTests" test
+TEST_ENV=local mvn "-Denv=dummyjson" "-Dtest=UserWorkflowTests" test
 ```
 
-### Override the API base URL
+Valid-login tests read configured credentials and compare the returned identity with that account. Negative tests retain deliberately invalid inputs. Only public DummyJSON demo credentials are stored in the profile; use environment variables or CI secrets for private credentials.
 
-The default configuration in `src/test/resources/config.properties` is:
+### Checkpoint 5.3 verification
 
-```properties
-base.url=https://dummyjson.com
-```
+The following checks intentionally include failed Maven runs:
 
-Override it for a test run using the `baseUrl` JVM system property:
+| Check | Command | Expected result |
+| --- | --- | --- |
+| Default profile | `mvn clean test` | Full suite passes when no overriding environment is set |
+| Explicit profile | `mvn "-Denv=dummyjson" clean test` | Full suite passes |
+| Unknown profile | `mvn "-Denv=does-not-exist" "-Dtest=UserWorkflowTests" test` | Fails with `Environment file not found: environments/does-not-exist.properties` |
+| Invalid configured URL | `mvn "-Denv=dummyjson" "-DbaseUrl=not-a-url" "-Dtest=UserWorkflowTests" test` | Fails with a base-URL validation error |
+| Local URL isolation | `mvn "-Denv=local" "-DbaseUrl=not-a-url" "-Dtest=TodoLifecycleTests" test` | Passes using the local server URL |
 
-```bash
-mvn clean test "-DbaseUrl=https://dummyjson.com"
-```
-
-An alternative base URL must expose the endpoints and response contracts expected by this suite.
-
-### Inspect test results
-
-Maven prints the execution summary in the terminal. Surefire writes detailed test results to:
-
-```text
-target/surefire-reports/
-```
-
-Generated files under `target/` should not be committed. Allure reports and automated GitHub Actions runs are planned for Phase 4.
+Static initialization errors may wrap the underlying configuration error in `ExceptionInInitializerError`. Finish verification with a successful full clean run so reports reflect the normal suite.
 
 ## Test Coverage
 
-### Products API
+The API suite contains **14 test executions**:
 
-| Scenario | Validation |
-| --- | --- |
-| Retrieve a product by ID | HTTP 200, expected ID, and presence of title and price |
-| Request a nonexistent product | HTTP 404 |
-| Retrieve products by category | Nonempty collection with the requested category on every item |
-| Limit the product collection | Returned collection size and response limit match the requested value |
+| Area | Executions | Coverage |
+| --- | --- | --- |
+| Products | 4 | Product by ID, missing product, category filter, result limit |
+| Authentication | 7 | Valid login, three invalid credential cases, current user with/without token, login schema |
+| User workflow | 1 | Login → authenticated profile → associated todos |
+| Local lifecycle | 2 | Retrieve created todo; delete and confirm absence |
 
-### Authentication API
+Each local test starts its own server and creates unique data in `@BeforeEach`. Cleanup in `@AfterEach` tolerates an already-deleted todo, confirms it is absent, and stops the server in a `finally` block. These tests use real persistence across requests within their local server instance.
 
-| Scenario | Validation |
-| --- | --- |
-| Login with valid credentials | HTTP 200, expected username, user ID, and nonblank access token |
-| Login with an incorrect password | HTTP 400 and invalid-credentials message |
-| Login with an unknown username | HTTP 400 and invalid-credentials message |
-| Login with both credentials incorrect | HTTP 400 and invalid-credentials message |
-| Request the current user with a valid token | HTTP 200 and identity matching the logged-in user |
-| Request the current user without a token | HTTP 401 and an error message |
-| Validate the login response schema | Required fields, field types, and nonempty token strings |
+Authenticated tests obtain their own tokens. The workflow checks the logged-in user's ID and username and verifies that every returned todo belongs to that user; an empty todo collection is valid.
 
-The Phase 3 suite defines **11 test executions**: four product scenarios and seven authentication executions. The invalid-credentials parameterized test contributes three executions.
+## Reports and Continuous Integration
 
-This describes the suite's coverage; the latest Maven output is the source of truth for pass/fail results.
+Surefire results: `target/surefire-reports/`
 
-## Authentication and Data Mapping
+Allure raw results: `target/allure-results/`
 
-Authentication tests send a `LoginRequest` to `POST /auth/login`. Jackson serializes that Java object into JSON and deserializes the successful response into `LoginResponse`.
+After a test run, generate the Allure HTML report:
 
-The authenticated-user test obtains its own access token and sends it to `GET /auth/me` through an `Authorization: Bearer <access-token>` header. Tests do not depend on another test running first.
+```bash
+mvn allure:report
+```
 
-The suite uses DummyJSON's public demonstration credentials. These are sample API data, not personal account credentials. Access tokens are obtained during execution rather than stored in source files.
+Report output: `target/site/allure-maven/`. To generate and view a report locally:
 
-Schema validation checks the response's structure. Value assertions separately check behavior, such as whether the returned username matches the account that logged in. The login schema permits additional response fields while requiring the fields used by its contract checks.
+```bash
+mvn allure:serve
+```
 
-## Test Design Principles
+GitHub Actions runs on pushes to `master`, pull requests targeting `master`, and manual dispatch. It sets up Java 25 and runs:
 
-- **Separation of concerns:** tests express expectations; clients handle HTTP operations.
-- **Reusable configuration:** shared request specifications keep request setup consistent.
-- **Independent tests:** each authenticated scenario prepares its own login prerequisite.
-- **Data-driven coverage:** parameterized tests exercise multiple invalid inputs without duplicating test logic.
-- **Behavior and contract validation:** assertions check status codes and values; schemas check required fields and types.
-- **Maintainable models:** request/response classes make authentication data explicit.
+```bash
+mvn --batch-mode --no-transfer-progress "-Denv=dummyjson" clean test
+```
 
-The suite exercises a public external service. Network failures, service outages, or API changes can affect results. Current authentication coverage does not include role-based authorization, token expiration, or token refresh.
+The same job includes local lifecycle tests because they supply their own URLs. It attempts Allure report generation when result files exist and uploads Surefire results, Allure results, and the HTML report as the `api-test-reports` artifact, retained for 14 days.
 
-## Learning Objectives
+Generated reports and build output are ignored by Git. Running the workflow locally does not verify a hosted GitHub Actions run.
 
-This project is built incrementally to develop practical understanding of:
+## Design and Limitations
 
-- REST API and HTTP concepts
-- Positive and negative test design
-- Path parameters, query parameters, and collection validation
-- Java classes, constructors, and request/response models
-- REST Assured clients and request specifications
-- Jackson serialization and deserialization
-- Bearer-token authentication
-- JUnit parameterized testing
-- JSON Schema validation
-- Maven dependency management and test execution
-- Git feature branches and pull requests
-
-## Next Milestone — Phase 4
-
-- Integrate Allure reporting with readable test names and failure details.
-- Run the suite through GitHub Actions on pull requests and updates to `master`.
-- Preserve test results and generated reports as downloadable CI artifacts.
-- Document local report viewing and CI execution.
-
-Further enhancements may include test data factories, additional API workflows, and broader environment configuration.
+- Keep the framework simple: tests, clients, models, a configuration utility, and shared request specifications.
+- Tests prepare their own prerequisites and do not rely on execution order.
+- Assertions check behavior; schemas check response structure.
+- Public API tests depend on network access and DummyJSON availability.
+- Authentication coverage does not yet include role-based authorization, token expiry, or token refresh.
+- Parallel execution is planned for **Checkpoint 5.4** and is not enabled by this checkpoint.

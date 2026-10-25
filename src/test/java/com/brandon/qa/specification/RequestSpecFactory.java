@@ -13,9 +13,12 @@ public final class RequestSpecFactory {
     }
 
     public static RequestSpecification create() {
+        return create(ConfigManager.getBaseUrl());
+    }
 
+    public static RequestSpecification create(String baseUrl) {
         return new RequestSpecBuilder()
-                .setBaseUri(ConfigManager.getBaseUrl())
+                .setBaseUri(ConfigManager.validateBaseUrl(baseUrl))
                 .setAccept(ContentType.JSON)
                 .build();
     }

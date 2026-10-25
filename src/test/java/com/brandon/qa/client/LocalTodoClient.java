@@ -1,5 +1,7 @@
 package com.brandon.qa.client;
 
+import com.brandon.qa.specification.RequestSpecFactory;
+
 import io.restassured.http.ContentType;
 import io.restassured.mapper.ObjectMapperType;
 import io.restassured.response.Response;
@@ -19,8 +21,7 @@ public class LocalTodoClient {
 
     private RequestSpecification request() {
         return given()
-                .baseUri(baseUrl)
-                .accept(ContentType.JSON);
+                .spec(RequestSpecFactory.create(baseUrl));
     }
 
     public Response createTodo(Map<String, Object> payload) {
