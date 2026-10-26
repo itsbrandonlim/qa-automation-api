@@ -1,6 +1,6 @@
 # QA Automation API Framework
 
-API automation portfolio project demonstrating practical Quality Engineering with Java 25, REST Assured, JUnit 5, and Maven.
+API automation portfolio project with Java 25, REST Assured, JUnit 5, and Maven.
 
 The suite tests the [DummyJSON REST API](https://dummyjson.com) and a local in-memory todo API. It covers products, authentication, an authenticated user workflow, and independent test-data setup and cleanup.
 
