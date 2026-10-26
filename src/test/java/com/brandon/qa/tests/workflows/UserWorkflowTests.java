@@ -1,5 +1,4 @@
 package com.brandon.qa.tests.workflows;
-
 import com.brandon.qa.config.ConfigManager;
 
 import com.brandon.qa.client.AuthClient;
@@ -26,9 +25,9 @@ class UserWorkflowTests {
     void shouldRetrieveTodosForLoggedInUser() {
         // Step 1: Log in using DummyJSON's public demo account.
         LoginRequest loginRequest = new LoginRequest(
-                ConfigManager.getUsername(),
-                ConfigManager.getPassword()
-        );
+        ConfigManager.getUsername(),
+        ConfigManager.getPassword()
+);
 
         Response loginResponse = authClient.login(loginRequest);
 
