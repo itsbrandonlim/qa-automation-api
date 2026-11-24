@@ -6,7 +6,7 @@ The suite tests the [DummyJSON REST API](https://dummyjson.com) and a local in-m
 
 ## Project Status
 
-**Current milestone: Phase 5 — Checkpoint 5.3, environment configuration.**
+**Current milestone: Phase 5 — Checkpoint 5.4, parallel execution.**
 
 | Phase / checkpoint | Scope | Implementation |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ The suite tests the [DummyJSON REST API](https://dummyjson.com) and a local in-m
 | 5.1 | Login → profile → user todos workflow | Implemented |
 | 5.2 | Local test-data setup and cleanup | Implemented |
 | 5.3 | Environment profiles and runtime overrides | Implemented |
-| 5.4 | Parallel execution | Next |
+| 5.4 | Parallel execution | Implemented |
 
 Implementation status is separate from execution results: use the latest Maven output and CI run to confirm whether tests pass.
 
@@ -59,6 +59,7 @@ Java source paths are relative to `src/test/java/com/brandon/qa/`.
 | `src/test/resources/environments/local.properties` | Local profile; server URL is supplied at runtime |
 | `src/test/resources/schemas/login-response-schema.json` | Login response contract |
 | `src/test/resources/allure.properties` | Allure results directory |
+| `src/test/resources/junit-platform.properties` | Parallel execution modes and worker limit |
 | `.github/workflows/api-tests.yml` | Java 25 CI, test execution, report generation, artifact upload |
 
 Tests describe behavior; clients handle requests. Both remote and local clients use `RequestSpecFactory`. Local clients explicitly supply the server-generated URL, so global base-URL overrides cannot redirect their setup or cleanup requests.
@@ -167,6 +168,48 @@ The following checks intentionally include failed Maven runs:
 
 Static initialization errors may wrap the underlying configuration error in `ExceptionInInitializerError`. Finish verification with a successful full clean run so reports reflect the normal suite.
 
+## Parallel Execution (Checkpoint 5.4)
+
+JUnit runs test classes and test methods concurrently by default, using a fixed pool of **two workers**. The maximum pool size is also two, keeping concurrency modest against the public demo API. These settings live in `src/test/resources/junit-platform.properties` and apply to Maven, CI, and IDE runs that load the test resources.
+
+The existing tests already isolate their state:
+
+- JUnit creates a new test instance for each test method.
+- Each request receives a fresh request specification; no test mutates REST Assured global configuration.
+- Tokens, payloads, and responses belong to individual tests.
+- Each local lifecycle test owns its server, dynamically allocated port, unique payload, and cleanup.
+- Environment configuration is shared read-only. Set overrides before the run, never from concurrent tests.
+
+Run the parallel suite:
+
+```bash
+mvn "-Denv=dummyjson" clean test
+```
+
+For debugging, disable parallel execution for one run:
+
+```bash
+mvn "-Denv=dummyjson" "-Djunit.jupiter.execution.parallel.enabled=false" clean test
+```
+
+Verify local setup and cleanup still use their own servers while running concurrently:
+
+```bash
+mvn "-Denv=local" "-DbaseUrl=not-a-url" "-Dtest=TodoLifecycleTests" clean test
+```
+
+For a higher-concurrency check, override both limits together:
+
+```bash
+mvn "-Denv=dummyjson" "-Djunit.jupiter.execution.parallel.config.fixed.parallelism=4" "-Djunit.jupiter.execution.parallel.config.fixed.max-pool-size=4" clean test
+```
+
+Use a clean run before generating Allure reports. In Allure's **Timeline**, overlapping tests on different worker threads demonstrate actual concurrency; a passing suite alone does not prove parallel execution. The suite should retain all 14 executions with no failures, errors, or skipped tests. Repeat parallel runs when checking for intermittent state-sharing failures.
+
+The existing CI test command uses the same parallel defaults. A branch push alone does not trigger the current workflow; use manual dispatch or a pull request targeting `master` to run hosted CI without merging.
+
+Configuration reference: [JUnit parallel execution](https://docs.junit.org/5.14.0/user-guide/index.html#writing-tests-parallel-execution).
+
 ## Test Coverage
 
 The API suite contains **14 test executions**:
@@ -217,4 +260,4 @@ Generated reports and build output are ignored by Git. Running the workflow loca
 - Assertions check behavior; schemas check response structure.
 - Public API tests depend on network access and DummyJSON availability.
 - Authentication coverage does not yet include role-based authorization, token expiry, or token refresh.
-- Parallel execution is planned for **Checkpoint 5.4** and is not enabled by this checkpoint.
+- Parallel execution uses two workers by default; it is functional test concurrency, not a load or performance test.
