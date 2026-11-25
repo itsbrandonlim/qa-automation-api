@@ -2,11 +2,11 @@
 
 API automation portfolio project with Java 25, REST Assured, JUnit 5, and Maven.
 
-The suite tests the [DummyJSON REST API](https://dummyjson.com) and a local in-memory todo API. It covers products, authentication, an authenticated user workflow, and independent test-data setup and cleanup.
+The suite tests the [DummyJSON REST API](https://dummyjson.com), a local in-memory todo API, and the product client against WireMock. It covers products, authentication, an authenticated user workflow, independent test-data setup and cleanup, and simulated dependency failures.
 
 ## Project Status
 
-**Current milestone: Phase 5 — Checkpoint 5.4, parallel execution.**
+**Current milestone: Phase 5 — Checkpoint 5.5, mock services.**
 
 | Phase / checkpoint | Scope | Implementation |
 | --- | --- | --- |
@@ -17,6 +17,8 @@ The suite tests the [DummyJSON REST API](https://dummyjson.com) and a local in-m
 | 5.2 | Local test-data setup and cleanup | Implemented |
 | 5.3 | Environment profiles and runtime overrides | Implemented |
 | 5.4 | Parallel execution | Implemented |
+| 5.5 | WireMock success, errors, delays, and read timeouts | Implemented |
+| 5.6 | Contract-testing concepts and consumer/provider verification | Planned |
 
 Implementation status is separate from execution results: use the latest Maven output and CI run to confirm whether tests pass.
 
@@ -33,6 +35,7 @@ Implementation status is separate from execution results: use the latest Maven o
 | Allure | Test results and HTML reports |
 | GitHub Actions | CI execution and downloadable reports |
 | Java HTTP server | Local in-memory todo test fixture |
+| WireMock | Local HTTP stubs and request verification for product-client tests |
 
 Dependency versions and build plugins are defined in `pom.xml`.
 
@@ -52,6 +55,7 @@ Java source paths are relative to `src/test/java/com/brandon/qa/`.
 | `tests/auth/AuthTests.java` | Authentication and schema tests |
 | `tests/workflows/UserWorkflowTests.java` | Login, retrieve profile, and verify user todos |
 | `tests/lifecycle/TodoLifecycleTests.java` | Create, retrieve, delete, and clean up local todos |
+| `tests/mocks/ProductMockTests.java` | Product-client request matching, HTTP errors, delays, and read timeouts |
 
 | Project-relative path | Purpose |
 | --- | --- |
@@ -97,6 +101,7 @@ Run commands from the directory containing `pom.xml`.
 | Authentication | `mvn "-Dtest=AuthTests" test` |
 | User workflow | `mvn "-Dtest=UserWorkflowTests" test` |
 | Local lifecycle | `mvn "-Denv=local" "-Dtest=TodoLifecycleTests" test` |
+| Mock services | `mvn "-Denv=local" "-Dtest=ProductMockTests" test` |
 
 `-Denv` selects configuration; `-Dtest` selects tests. The `local` profile does not select local tests automatically. Running the entire suite with `-Denv=local` fails because the local API has no DummyJSON authentication or product endpoints.
 
@@ -204,15 +209,55 @@ For a higher-concurrency check, override both limits together:
 mvn "-Denv=dummyjson" "-Djunit.jupiter.execution.parallel.config.fixed.parallelism=4" "-Djunit.jupiter.execution.parallel.config.fixed.max-pool-size=4" clean test
 ```
 
-Use a clean run before generating Allure reports. In Allure's **Timeline**, overlapping tests on different worker threads demonstrate actual concurrency; a passing suite alone does not prove parallel execution. The suite should retain all 14 executions with no failures, errors, or skipped tests. Repeat parallel runs when checking for intermittent state-sharing failures.
+Use a clean run before generating Allure reports. In Allure's **Timeline**, overlapping tests on different worker threads demonstrate actual concurrency; a passing suite alone does not prove parallel execution. The suite should retain all 21 executions with no failures, errors, or skipped tests. Repeat parallel runs when checking for intermittent state-sharing failures.
 
 The existing CI test command uses the same parallel defaults. A branch push alone does not trigger the current workflow; use manual dispatch or a pull request targeting `master` to run hosted CI without merging.
 
 Configuration reference: [JUnit parallel execution](https://docs.junit.org/5.14.0/user-guide/index.html#writing-tests-parallel-execution).
 
+## Mock Services (Checkpoint 5.5)
+
+`ProductMockTests` runs the existing `ProductClient` against an embedded WireMock server. This lets us reproduce dependency responses without relying on DummyJSON availability or making the public service fail on demand.
+
+Each test registers an **instance-scoped** `WireMockExtension`. JUnit starts a separate loopback server on a dynamic port for each test and stops it afterward, including when assertions fail. Stubs and request journals belong to that test. All registrations and verifications use `mockApi.stubFor(...)` and `mockApi.verify(...)`; the shared static WireMock client is not configured. Unmatched requests fail the test.
+
+`ProductClient()` still uses the selected environment. `ProductClient(baseUrl)` uses an explicit URL, and `ProductClient(baseUrl, readTimeoutMillis)` also sets a positive socket read timeout. The default read timeout is 10 seconds. Each call creates a fresh request specification and client configuration; no test changes global REST Assured settings or system properties. A socket read timeout limits waiting for response data; it is not a total request deadline or connection timeout.
+
+| Scenario | What the test checks |
+| --- | --- |
+| Product success | Product ID in the path, JSON Accept header, response fields, one request |
+| Result limit | Query parameter and returned collection size |
+| Category filter | Category path and response category |
+| Missing product | Explicit stubbed 404 and error message, rather than WireMock's unmatched-request 404 |
+| Unavailable service | 503, error body, Retry-After header, and a single request |
+| Delayed success | A 200 ms delayed response succeeds within the default timeout |
+| Read timeout | A 3-second delayed response raises `SocketTimeoutException` with a 500 ms read timeout |
+
+The timeout test checks the exception type rather than an exact elapsed duration. HTTP errors remain responses that tests can inspect; a read timeout is a transport exception with no HTTP status. The client does not implement a retry policy for these cases.
+
+Run only the mocks:
+
+```bash
+mvn "-Denv=local" "-Dtest=ProductMockTests" clean test
+```
+
+Verify isolation from a global URL override, including four concurrent workers:
+
+```bash
+mvn "-Denv=local" "-DbaseUrl=not-a-url" "-Dtest=ProductMockTests" "-Djunit.jupiter.execution.parallel.config.fixed.parallelism=4" "-Djunit.jupiter.execution.parallel.config.fixed.max-pool-size=4" clean test
+```
+
+The mock tests need no external API access after Maven dependencies are cached. They run automatically in the existing full-suite CI command. No WireMock process, Docker container, fixed port, or new environment profile is needed.
+
+For study, trace `stubFor → ProductClient → RequestSpecFactory → HTTP response/assertion → verify`. Change the requested path or query parameter to see an unmatched-request failure, then restore it. Explain why a 503 response and a socket timeout require different assertions.
+
+These tests demonstrate client behavior against responses we define. They do not prove that DummyJSON implements those responses, validate a production application's recovery behavior, or complete Checkpoint 5.6. The local todo API remains a stateful fixture for data lifecycle tests; WireMock supplies controlled dependency responses.
+
+The test-scoped `wiremock-standalone` dependency shades its server dependencies to avoid clashes with REST Assured and Jackson. References: [WireMock installation](https://wiremock.org/docs/download-and-installation/), [JUnit extension lifecycle](https://wiremock.org/docs/junit-jupiter/), and [simulating delays and faults](https://wiremock.org/docs/simulating-faults/).
+
 ## Test Coverage
 
-The API suite contains **14 test executions**:
+The API suite contains **21 test executions**:
 
 | Area | Executions | Coverage |
 | --- | --- | --- |
@@ -220,6 +265,7 @@ The API suite contains **14 test executions**:
 | Authentication | 7 | Valid login, three invalid credential cases, current user with/without token, login schema |
 | User workflow | 1 | Login → authenticated profile → associated todos |
 | Local lifecycle | 2 | Retrieve created todo; delete and confirm absence |
+| Mock services | 7 | Product, limit, category, 404, 503, delayed success, and read timeout |
 
 Each local test starts its own server and creates unique data in `@BeforeEach`. Cleanup in `@AfterEach` tolerates an already-deleted todo, confirms it is absent, and stops the server in a `finally` block. These tests use real persistence across requests within their local server instance.
 
@@ -249,7 +295,7 @@ GitHub Actions runs on pushes to `master`, pull requests targeting `master`, and
 mvn --batch-mode --no-transfer-progress "-Denv=dummyjson" clean test
 ```
 
-The same job includes local lifecycle tests because they supply their own URLs. It attempts Allure report generation when result files exist and uploads Surefire results, Allure results, and the HTML report as the `api-test-reports` artifact, retained for 14 days.
+The same job includes local lifecycle and mock-service tests because they supply their own URLs. It attempts Allure report generation when result files exist and uploads Surefire results, Allure results, and the HTML report as the `api-test-reports` artifact, retained for 14 days.
 
 Generated reports and build output are ignored by Git. Running the workflow locally does not verify a hosted GitHub Actions run.
 
@@ -259,5 +305,6 @@ Generated reports and build output are ignored by Git. Running the workflow loca
 - Tests prepare their own prerequisites and do not rely on execution order.
 - Assertions check behavior; schemas check response structure.
 - Public API tests depend on network access and DummyJSON availability.
+- WireMock tests check the product client against authored stubs; provider compatibility remains separate work in Checkpoint 5.6.
 - Authentication coverage does not yet include role-based authorization, token expiry, or token refresh.
 - Parallel execution uses two workers by default; it is functional test concurrency, not a load or performance test.

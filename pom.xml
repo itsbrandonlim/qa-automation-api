@@ -19,6 +19,7 @@
         <restassured.version>6.0.1</restassured.version>
         <junit.version>5.14.4</junit.version>
         <jackson.version>2.20.0</jackson.version>
+        <wiremock.version>3.13.2</wiremock.version>
     </properties>
 
     <dependencyManagement>
@@ -34,6 +35,14 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- Shaded dependencies keep WireMock's server separate from REST Assured/Jackson. -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>${wiremock.version}</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
