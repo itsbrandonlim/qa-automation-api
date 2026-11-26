@@ -20,6 +20,7 @@
         <junit.version>5.14.4</junit.version>
         <jackson.version>2.20.0</jackson.version>
         <wiremock.version>3.13.2</wiremock.version>
+        <pact.version>4.6.20</pact.version>
     </properties>
 
     <dependencyManagement>
@@ -35,6 +36,19 @@
     </dependencyManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>au.com.dius.pact.consumer</groupId>
+            <artifactId>junit5</artifactId>
+            <version>${pact.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>au.com.dius.pact.provider</groupId>
+            <artifactId>junit5</artifactId>
+            <version>${pact.version}</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Shaded dependencies keep WireMock's server separate from REST Assured/Jackson. -->
         <dependency>
             <groupId>org.wiremock</groupId>
@@ -85,6 +99,37 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
+                <configuration>
+                    <useSystemClassLoader>false</useSystemClassLoader>
+                    <systemPropertyVariables>
+                        <pact.rootDir>${project.build.directory}/pacts</pact.rootDir>
+                        <pact.writer.overwrite>true</pact.writer.overwrite>
+                        <pact.mockserver.addCloseHeader>true</pact.mockserver.addCloseHeader>
+                        <pact_do_not_track>true</pact_do_not_track>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+
+            <!-- Verify generated consumer contracts only after the test phase completes. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.5.4</version>
+                <configuration>
+                    <useSystemClassLoader>false</useSystemClassLoader>
+                    <failIfNoTests>true</failIfNoTests>
+                    <systemPropertyVariables>
+                        <pact_do_not_track>true</pact_do_not_track>
+                    </systemPropertyVariables>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <plugin>

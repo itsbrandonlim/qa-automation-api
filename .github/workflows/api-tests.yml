@@ -30,7 +30,7 @@ jobs:
           cache: maven
 
       - name: Run tests
-        run: mvn --batch-mode --no-transfer-progress "-Denv=dummyjson" clean test
+        run: mvn --batch-mode --no-transfer-progress "-Denv=dummyjson" clean verify
 
       - name: Generate Allure report
         if: ${{ always() && hashFiles('target/allure-results/*-result.json') != '' }}
@@ -43,6 +43,8 @@ jobs:
           name: api-test-reports
           path: |
             target/surefire-reports/
+            target/failsafe-reports/
+            target/pacts/
             target/allure-results/
             target/site/allure-maven/
           if-no-files-found: warn

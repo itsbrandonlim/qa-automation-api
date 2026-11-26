@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "required": ["id", "todo", "completed"],
+  "properties": {
+    "id": { "type": "integer", "minimum": 1 },
+    "todo": { "type": "string", "minLength": 1 },
+    "completed": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}

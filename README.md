@@ -6,7 +6,7 @@ The suite tests the [DummyJSON REST API](https://dummyjson.com), a local in-memo
 
 ## Project Status
 
-**Current milestone: Phase 5 — Checkpoint 5.5, mock services.**
+**Current milestone: Phase 5 — Checkpoint 5.6, contract concepts.**
 
 | Phase / checkpoint | Scope | Implementation |
 | --- | --- | --- |
@@ -18,7 +18,7 @@ The suite tests the [DummyJSON REST API](https://dummyjson.com), a local in-memo
 | 5.3 | Environment profiles and runtime overrides | Implemented |
 | 5.4 | Parallel execution | Implemented |
 | 5.5 | WireMock success, errors, delays, and read timeouts | Implemented |
-| 5.6 | Contract-testing concepts and consumer/provider verification | Planned |
+| 5.6 | Schema compatibility examples and Pact consumer/provider verification | Implemented |
 
 Implementation status is separate from execution results: use the latest Maven output and CI run to confirm whether tests pass.
 
@@ -36,6 +36,7 @@ Implementation status is separate from execution results: use the latest Maven o
 | GitHub Actions | CI execution and downloadable reports |
 | Java HTTP server | Local in-memory todo test fixture |
 | WireMock | Local HTTP stubs and request verification for product-client tests |
+| Pact JVM / Maven Failsafe | Generate consumer contracts, then verify them against the local provider |
 
 Dependency versions and build plugins are defined in `pom.xml`.
 
@@ -56,12 +57,16 @@ Java source paths are relative to `src/test/java/com/brandon/qa/`.
 | `tests/workflows/UserWorkflowTests.java` | Login, retrieve profile, and verify user todos |
 | `tests/lifecycle/TodoLifecycleTests.java` | Create, retrieve, delete, and clean up local todos |
 | `tests/mocks/ProductMockTests.java` | Product-client request matching, HTTP errors, delays, and read timeouts |
+| `tests/contracts/TodoSchemaContractTests.java` | Compatible additions, breaking shape changes, and schema limitations |
+| `tests/contracts/TodoConsumerContractTests.java` | Exercise the real todo client against Pact and generate four interactions |
+| `tests/contracts/TodoProviderContractIT.java` | Replay generated interactions against a fresh real `LocalTodoApi` |
 
 | Project-relative path | Purpose |
 | --- | --- |
 | `src/test/resources/environments/dummyjson.properties` | Default API URL and public demo credentials |
 | `src/test/resources/environments/local.properties` | Local profile; server URL is supplied at runtime |
 | `src/test/resources/schemas/login-response-schema.json` | Login response contract |
+| `src/test/resources/schemas/todo-response-schema.json` | Todo response shape used by compatibility examples |
 | `src/test/resources/allure.properties` | Allure results directory |
 | `src/test/resources/junit-platform.properties` | Parallel execution modes and worker limit |
 | `.github/workflows/api-tests.yml` | Java 25 CI, test execution, report generation, artifact upload |
@@ -89,19 +94,20 @@ git --version
 ```bash
 git clone https://github.com/itsbrandonlim/qa-automation-api.git
 cd qa-automation-api
-mvn clean test
+mvn clean verify
 ```
 
-Run commands from the directory containing `pom.xml`.
+Run commands from the directory containing `pom.xml`. **Use `verify` for the complete suite.** `test` runs Surefire tests and generates the Pact file; Failsafe verifies the provider later in `verify`. A successful `mvn test` alone does not complete Checkpoint 5.6.
 
 | Scope | Command |
 | --- | --- |
-| Full suite, explicit default profile | `mvn "-Denv=dummyjson" clean test` |
+| Full suite, explicit default profile | `mvn "-Denv=dummyjson" clean verify` |
 | Products | `mvn "-Dtest=ProductTests" test` |
 | Authentication | `mvn "-Dtest=AuthTests" test` |
 | User workflow | `mvn "-Dtest=UserWorkflowTests" test` |
 | Local lifecycle | `mvn "-Denv=local" "-Dtest=TodoLifecycleTests" test` |
 | Mock services | `mvn "-Denv=local" "-Dtest=ProductMockTests" test` |
+| Contracts only, including provider | `mvn "-Denv=local" "-Dtest=Todo*ContractTests" clean verify` |
 
 `-Denv` selects configuration; `-Dtest` selects tests. The `local` profile does not select local tests automatically. Running the entire suite with `-Denv=local` fails because the local API has no DummyJSON authentication or product endpoints.
 
@@ -165,8 +171,8 @@ The following checks intentionally include failed Maven runs:
 
 | Check | Command | Expected result |
 | --- | --- | --- |
-| Default profile | `mvn clean test` | Full suite passes when no overriding environment is set |
-| Explicit profile | `mvn "-Denv=dummyjson" clean test` | Full suite passes |
+| Default profile | `mvn clean verify` | Full suite passes when no overriding environment is set |
+| Explicit profile | `mvn "-Denv=dummyjson" clean verify` | Full suite passes |
 | Unknown profile | `mvn "-Denv=does-not-exist" "-Dtest=UserWorkflowTests" test` | Fails with `Environment file not found: environments/does-not-exist.properties` |
 | Invalid configured URL | `mvn "-Denv=dummyjson" "-DbaseUrl=not-a-url" "-Dtest=UserWorkflowTests" test` | Fails with a base-URL validation error |
 | Local URL isolation | `mvn "-Denv=local" "-DbaseUrl=not-a-url" "-Dtest=TodoLifecycleTests" test` | Passes using the local server URL |
@@ -188,13 +194,13 @@ The existing tests already isolate their state:
 Run the parallel suite:
 
 ```bash
-mvn "-Denv=dummyjson" clean test
+mvn "-Denv=dummyjson" clean verify
 ```
 
 For debugging, disable parallel execution for one run:
 
 ```bash
-mvn "-Denv=dummyjson" "-Djunit.jupiter.execution.parallel.enabled=false" clean test
+mvn "-Denv=dummyjson" "-Djunit.jupiter.execution.parallel.enabled=false" clean verify
 ```
 
 Verify local setup and cleanup still use their own servers while running concurrently:
@@ -206,10 +212,10 @@ mvn "-Denv=local" "-DbaseUrl=not-a-url" "-Dtest=TodoLifecycleTests" clean test
 For a higher-concurrency check, override both limits together:
 
 ```bash
-mvn "-Denv=dummyjson" "-Djunit.jupiter.execution.parallel.config.fixed.parallelism=4" "-Djunit.jupiter.execution.parallel.config.fixed.max-pool-size=4" clean test
+mvn "-Denv=dummyjson" "-Djunit.jupiter.execution.parallel.config.fixed.parallelism=4" "-Djunit.jupiter.execution.parallel.config.fixed.max-pool-size=4" clean verify
 ```
 
-Use a clean run before generating Allure reports. In Allure's **Timeline**, overlapping tests on different worker threads demonstrate actual concurrency; a passing suite alone does not prove parallel execution. The suite should retain all 21 executions with no failures, errors, or skipped tests. Repeat parallel runs when checking for intermittent state-sharing failures.
+Use a clean run before generating Allure reports. In Allure's **Timeline**, overlapping tests on different worker threads demonstrate actual concurrency; a passing suite alone does not prove parallel execution. A full `verify` should retain all 34 executions (30 Surefire tests plus 4 Failsafe interactions) with no failures, errors, or skipped tests. Pact classes explicitly run their methods sequentially to keep contract generation and verification predictable; existing API and WireMock tests retain their parallel defaults. Repeat parallel runs when checking for intermittent state-sharing failures.
 
 The existing CI test command uses the same parallel defaults. A branch push alone does not trigger the current workflow; use manual dispatch or a pull request targeting `master` to run hosted CI without merging.
 
@@ -255,9 +261,21 @@ These tests demonstrate client behavior against responses we define. They do not
 
 The test-scoped `wiremock-standalone` dependency shades its server dependencies to avoid clashes with REST Assured and Jackson. References: [WireMock installation](https://wiremock.org/docs/download-and-installation/), [JUnit extension lifecycle](https://wiremock.org/docs/junit-jupiter/), and [simulating delays and faults](https://wiremock.org/docs/simulating-faults/).
 
+## Contract Concepts (Checkpoint 5.6)
+
+This checkpoint adds JSON Schema compatibility exercises and a Pact consumer/provider workflow. The real `LocalTodoClient` generates four interactions against Pact's mock; Maven Failsafe then replays those interactions against a fresh real `LocalTodoApi`. Schema checks illustrate allowed additive fields, breaking shape changes, and why valid structure alone does not establish correct identity.
+
+```bash
+mvn "-Denv=local" "-Dtest=Todo*ContractTests" clean verify
+```
+
+Consumer generation runs in the `test` phase and provider verification runs later through `verify`. No ordering between test classes is required. The generated contract stays under `target/pacts/`; no Pact Broker or Docker service is needed. Provider verification covers the local todo API, not DummyJSON.
+
+Read the [Checkpoint 5.6 study guide](docs/checkpoint-5-6-contract-concepts.md) for the comparison table, build flow, failure exercise, and interview explanation.
+
 ## Test Coverage
 
-The API suite contains **21 test executions**:
+The complete `mvn clean verify` build contains **34 test executions**:
 
 | Area | Executions | Coverage |
 | --- | --- | --- |
@@ -266,6 +284,9 @@ The API suite contains **21 test executions**:
 | User workflow | 1 | Login → authenticated profile → associated todos |
 | Local lifecycle | 2 | Retrieve created todo; delete and confirm absence |
 | Mock services | 7 | Product, limit, category, 404, 503, delayed success, and read timeout |
+| Schema compatibility | 5 | Original/additive shape, three breaking shapes, and identity limitation |
+| Pact consumer | 4 | Create, retrieve, missing todo, and delete through the real client |
+| Pact provider (Failsafe) | 4 | Generated requests verified against the real local provider |
 
 Each local test starts its own server and creates unique data in `@BeforeEach`. Cleanup in `@AfterEach` tolerates an already-deleted todo, confirms it is absent, and stops the server in a `finally` block. These tests use real persistence across requests within their local server instance.
 
@@ -274,6 +295,10 @@ Authenticated tests obtain their own tokens. The workflow checks the logged-in u
 ## Reports and Continuous Integration
 
 Surefire results: `target/surefire-reports/`
+
+Provider verification results: `target/failsafe-reports/`
+
+Generated contract: `target/pacts/LocalTodoClient-LocalTodoApi.json`
 
 Allure raw results: `target/allure-results/`
 
@@ -292,10 +317,10 @@ mvn allure:serve
 GitHub Actions runs on pushes to `master`, pull requests targeting `master`, and manual dispatch. It sets up Java 25 and runs:
 
 ```bash
-mvn --batch-mode --no-transfer-progress "-Denv=dummyjson" clean test
+mvn --batch-mode --no-transfer-progress "-Denv=dummyjson" clean verify
 ```
 
-The same job includes local lifecycle and mock-service tests because they supply their own URLs. It attempts Allure report generation when result files exist and uploads Surefire results, Allure results, and the HTML report as the `api-test-reports` artifact, retained for 14 days.
+The same job includes local lifecycle, mock-service, and contract tests because they supply their own URLs. It attempts Allure report generation when result files exist and uploads Surefire results, Failsafe results, generated Pact files, Allure results, and the HTML report as the `api-test-reports` artifact, retained for 14 days. Failsafe verification failures fail the CI build.
 
 Generated reports and build output are ignored by Git. Running the workflow locally does not verify a hosted GitHub Actions run.
 
@@ -305,6 +330,6 @@ Generated reports and build output are ignored by Git. Running the workflow loca
 - Tests prepare their own prerequisites and do not rely on execution order.
 - Assertions check behavior; schemas check response structure.
 - Public API tests depend on network access and DummyJSON availability.
-- WireMock tests check the product client against authored stubs; provider compatibility remains separate work in Checkpoint 5.6.
+- WireMock checks the product client against authored stubs. Pact verifies four todo interactions against the local provider; it does not verify DummyJSON or all possible provider behavior.
 - Authentication coverage does not yet include role-based authorization, token expiry, or token refresh.
 - Parallel execution uses two workers by default; it is functional test concurrency, not a load or performance test.
